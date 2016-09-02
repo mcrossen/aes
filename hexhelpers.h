@@ -1,4 +1,6 @@
 #pragma once
+#include <sstream>
+#include <math.h>
 
 using namespace std;
 
@@ -28,11 +30,17 @@ unsigned int hex_char_to_int(char c) {
 unsigned int hex_to_int(string hex) {
   unsigned int cumulative = 0;
   for (unsigned int index = 0; index < hex.length(); index++) {
-    cumulative += 16^index * hex_char_to_int(hex[hex.length() - index - 1]);
+    cumulative += pow(16, hex.length() - index - 1) * hex_char_to_int(hex[index]);
   }
   return cumulative;
 }
 
 unsigned int hex_to_int(char* hex) {
   return hex_to_int(string(hex));
+}
+
+std::string int_to_hex(unsigned int num) {
+  std::stringstream hex;
+  hex << std::hex << num;
+  return hex.str();
 }

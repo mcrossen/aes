@@ -28,9 +28,9 @@ int main(int argc, char** argv) {
 
     if (arg1 == "e") {
       std::stringstream cypher_text;
-      for (unsigned int index = 0; index < plaintext.length(); index += BLOCK_LENGTH/4 - 1)
+      for (unsigned int index = 0; index < plaintext.length(); index += BLOCK_LENGTH/4)
       {
-        state crypt_state(plaintext.substr(0, BLOCK_LENGTH));
+        state crypt_state(plaintext.substr(0, BLOCK_LENGTH / 4 - 1));
         cypher_text << crypt_state.encrypt(key);
       }
       std::cout << cypher_text.str() << std::endl;
