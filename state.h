@@ -1,9 +1,9 @@
 #pragma once
 #include <vector>
 #include <sstream>
-#include <iostream>//TODO: remove this include
 #include "hexhelpers.h"
 #include "keyscheduler.h"
+#include "logger.h"
 
 #define BLOCK_LENGTH 128
 #define UPPER_BITS_MASK 0xf0
@@ -12,7 +12,7 @@
 class state {
   public:
     state(std::string block) {
-      rows = std::vector<std::vector<unsigned int> >(4, std::vector<unsigned int>(4, 0));
+      rows = std::vector<std::vector<uint8_t> >(4, std::vector<uint8_t>(4, 0));
       unsigned int block_index = 0;
       for (unsigned int column = 0; column < 4; column++) {
         for (unsigned int row = 0; row < 4; row++) {
@@ -23,12 +23,13 @@ class state {
     }
 
     std::string encrypt(std::string key) {
-      std::cout << "round[ 0].input\t\t" << to_string() << std::endl;//TODO: remove this debug
+      logger log;
+      log.debug(0, "input\t", to_string());
 
       keyScheduler keys(key);
 
       addRoundKey(keys.next());
-      std::cout << "round[ 0].addRoundKey\t" << to_string() << std::endl;//TODO: remove this debug
+      log.debug(0, "addRoundKey", to_string());
       unsigned int key_length = key.length() * 4;
       unsigned int total_rounds;
       if (key_length == 128) {
@@ -43,26 +44,28 @@ class state {
 
       // go through each round except the final round
       for (unsigned int round_index = 1; round_index < total_rounds; round_index++) {
+        std::vector<std::vector<uint8_t> > key = keys.next();
+        //log.debug(round_index, "scheduler", key)
         subBytes();
-        std::cout << "round[ " << round_index << "].subBytes\t" << to_string() << std::endl;//TODO: remove this debug
+        log.debug(round_index, "subBytes", to_string());
         shiftRows();
-        std::cout << "round[ " << round_index << "].shiftRows\t" << to_string() << std::endl;//TODO: remove this debug
+        log.debug(round_index, "shiftRows", to_string());
         mixColumns();
-        std::cout << "round[ " << round_index << "].mixColumns\t" << to_string() << std::endl;//TODO: remove this debug
-        addRoundKey(keys.next());
-        std::cout << "round[ " << round_index << "].addRoundKey\t" << to_string() << std::endl;//TODO: remove this debug
+        log.debug(round_index, "mixColumns", to_string());
+        addRoundKey(key);
+        log.debug(round_index, "addRoundKey", to_string());
       }
       // the final round doesn't include mixColumns step
       subBytes();
-      std::cout << "round[10].subBytes\t" << to_string() << std::endl;//TODO: remove this debug
+      log.debug(10, "subBytes", to_string());
       shiftRows();
-      std::cout << "round[10].shiftRows\t" << to_string() << std::endl;//TODO: remove this debug
+      log.debug(10, "shiftRows", to_string());
       addRoundKey(keys.next());
-      std::cout << "round[10].addRoundKey\t" << to_string() << std::endl;//TODO: remove this debug
+      log.debug(10, "addRoundKey", to_string());
       return to_string();
     }
 
-    void addRoundKey(std::vector<std::vector<unsigned int> > key) {
+    void addRoundKey(std::vector<std::vector<uint8_t> > key) {
       for (unsigned int column = 0; column < 4; column++) {
         for (unsigned int row = 0; row < 4; row++) {
           rows[row][column] = rows[row][column] ^ key[row][column];
@@ -70,7 +73,7 @@ class state {
       }
     }
 
-    unsigned int subByte(unsigned int byte) {
+    unsigned int subByte(uint8_t byte) {
       return sbox[(byte & UPPER_BITS_MASK) >> 4][byte & LOWER_BITS_MASK];
     }
 
@@ -95,12 +98,12 @@ class state {
     }
 
     void mixColumns() {
-      std::vector<std::vector<unsigned int> > new_state(4, std::vector<unsigned int>(4, 0));
+      std::vector<std::vector<uint8_t> > new_state(4, std::vector<uint8_t>(4, 0));
       for (unsigned int column = 0; column < 4; column++) {
         for (unsigned int index = 0; index < 4; index++) {
-          unsigned int cumulative = 0;
+          uint8_t cumulative = 0;
           for (unsigned int row = 0; row < 4; row ++) {
-            unsigned int result = fixed_mat[index][row] * rows[row][column];
+            uint8_t result = fixed_mat[index][row] * rows[row][column];
             if (result > 0xff) {
               cumulative = cumulative ^ (result ^ 0x1b);
             } else {
@@ -117,14 +120,14 @@ class state {
       stringstream output;
       for (unsigned int column = 0; column < 4; column++) {
         for (unsigned int row = 0; row < 4; row++) {
-          output << int_to_hex(rows[row][column]);
+          output << byte_to_hex(rows[row][column]);
         }
       }
       return output.str();
     }
   private:
-    std::vector<std::vector<unsigned int> > rows;
-    const unsigned int sbox[16][16] = {
+    std::vector<std::vector<uint8_t> > rows;
+    const uint8_t sbox[16][16] = {
       { 0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76 } ,
       { 0xca, 0x82, 0xc9, 0x7d, 0xfa, 0x59, 0x47, 0xf0, 0xad, 0xd4, 0xa2, 0xaf, 0x9c, 0xa4, 0x72, 0xc0 } ,
       { 0xb7, 0xfd, 0x93, 0x26, 0x36, 0x3f, 0xf7, 0xcc, 0x34, 0xa5, 0xe5, 0xf1, 0x71, 0xd8, 0x31, 0x15 } ,
@@ -142,7 +145,7 @@ class state {
       { 0xe1, 0xf8, 0x98, 0x11, 0x69, 0xd9, 0x8e, 0x94, 0x9b, 0x1e, 0x87, 0xe9, 0xce, 0x55, 0x28, 0xdf } ,
       { 0x8c, 0xa1, 0x89, 0x0d, 0xbf, 0xe6, 0x42, 0x68, 0x41, 0x99, 0x2d, 0x0f, 0xb0, 0x54, 0xbb, 0x16 }
     };
-    const unsigned int fixed_mat[4][4] = {
+    const uint8_t fixed_mat[4][4] = {
       {2, 3, 1, 1} ,
       {1, 2, 3, 1} ,
       {1, 1, 2, 3} ,
