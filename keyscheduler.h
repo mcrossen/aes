@@ -28,20 +28,17 @@ class keyScheduler {
           key_index += 2;
         }
       }
-//TODO: probably doesn't work well with keys other than 128. this would try writing over the excess.
+
       next_rcon = 1;
-      for (unsigned int key = 1; key < total_keys; key++) {
-        columns[key*4] = rcon(columns[key*4 - 4], subBytes(rotWord(columns[key*4 - 1])));
-        for (unsigned int word_index = 1; word_index < 4; word_index++) {
-          for (unsigned int row = 0; row < columns[key*4+word_index].size(); row++) {
-            columns[key*4+word_index][row] = columns[key*4+word_index-4][row] ^ columns[key*4+word_index-1][row];
+      for (unsigned int column = key.size()*4/WORD_LENGTH; column < columns.size(); column+=4) {
+        columns[column] = rcon(columns[column - 4], subBytes(rotWord(columns[column - 1])));
+        for (unsigned int word_index = column + 1; word_index < column + 4 && word_index < columns.size(); word_index++) {
+          for (unsigned int row = 0; row < columns[word_index].size(); row++) {
+            columns[word_index][row] = columns[word_index-4][row] ^ columns[word_index-1][row];
           }
         }
       }
-      for (unsigned int index = 0; index < total_keys; index++) {
-        logger log;
-        log.debug(index + 1, "scheduler", to_string(next()));
-      }
+      //logger log; log.debug(to_string()); // dump the entire key schedule to the display
     }
 
     std::vector<uint8_t> rcon(std::vector<uint8_t> prev_word, std::vector<uint8_t> word) {
@@ -75,24 +72,34 @@ class keyScheduler {
     }
 
     std::vector<std::vector<uint8_t> > next() {
-      std::vector<std::vector<uint8_t> > rows(4, std::vector<uint8_t>(4, 0));
-      for (unsigned int column = next_key*4; column < next_key*4+4; column++) {
-        for (unsigned int row = 0; row < 4; row++) {
-          rows[row][column] = columns[column][row];
+      std::vector<std::vector<uint8_t> > to_return(4, vector<uint8_t>(4, 0));
+      stringstream debug_string;
+      for (unsigned int column = next_key*4; column < next_key*4+4 && column < columns.size(); column++) {
+        for (unsigned int row = 0; row < columns[column].size(); row++) {
+          to_return[row][column - next_key*4] = columns[column][row];
+          debug_string << byte_to_hex(to_return[row][column - next_key*4]);
         }
       }
+      logger log;
+      log.debug(next_key, "scheduler", debug_string.str());
       next_key++;
-      return rows;
+      return to_return;
     }
 
-    std::string to_string(std::vector<std::vector<uint8_t> > rows) {
-      stringstream output;
-      for (unsigned int column = 0; column < 4; column++) {
-        for (unsigned int row = 0; row < 4; row++) {
-          output << byte_to_hex(rows[row][column]);
+    std::string to_string() {
+      stringstream to_return;
+      bool first_line = true;
+      for (unsigned int row = 0; row < 4; row++) {
+        if (!first_line) {
+          to_return << std::endl;
+        } else {
+          first_line = false;
+        }
+        for (unsigned int column = 0; column < columns.size(); column++) {
+          to_return << byte_to_hex(columns[column][row]) << " ";
         }
       }
-      return output.str();
+      return to_return.str();
     }
 
   private:

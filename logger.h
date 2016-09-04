@@ -13,6 +13,12 @@ public:
     }
   }
 
+  void debug(std::string output) {
+    if (logger::verbose) {
+      std::cout << output << std::endl;
+    }
+  }
+
   static bool verbose;
 };
 

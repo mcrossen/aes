@@ -12,6 +12,9 @@
 class state {
   public:
     state(std::string block) {
+      if (block.length()*4 != 128) {
+        throw;
+      }
       rows = std::vector<std::vector<uint8_t> >(4, std::vector<uint8_t>(4, 0));
       unsigned int block_index = 0;
       for (unsigned int column = 0; column < 4; column++) {
@@ -24,12 +27,11 @@ class state {
 
     std::string encrypt(std::string key) {
       logger log;
-      log.debug(0, "input\t", to_string());
 
       keyScheduler keys(key);
 
+      log.debug(0, "input\t", to_string());
       addRoundKey(keys.next());
-      log.debug(0, "addRoundKey", to_string());
       unsigned int key_length = key.length() * 4;
       unsigned int total_rounds;
       if (key_length == 128) {
@@ -44,15 +46,14 @@ class state {
 
       // go through each round except the final round
       for (unsigned int round_index = 1; round_index < total_rounds; round_index++) {
-        std::vector<std::vector<uint8_t> > key = keys.next();
-        //log.debug(round_index, "scheduler", key)
+        log.debug(round_index, "start\t", to_string());
         subBytes();
         log.debug(round_index, "subBytes", to_string());
         shiftRows();
         log.debug(round_index, "shiftRows", to_string());
         mixColumns();
         log.debug(round_index, "mixColumns", to_string());
-        addRoundKey(key);
+        addRoundKey(keys.next());
         log.debug(round_index, "addRoundKey", to_string());
       }
       // the final round doesn't include mixColumns step
@@ -61,7 +62,6 @@ class state {
       shiftRows();
       log.debug(10, "shiftRows", to_string());
       addRoundKey(keys.next());
-      log.debug(10, "addRoundKey", to_string());
       return to_string();
     }
 
@@ -97,20 +97,38 @@ class state {
       }
     }
 
+
+    uint8_t xtime(uint8_t a, uint8_t b) {
+      if (b == 1) {
+        return a;
+      } else if (b == 2) {
+        uint16_t shifted = ((uint16_t)a) << 1;
+        if (shifted > 0xff) {
+          return (uint8_t)(shifted ^ 0x1b);
+        } else {
+          return shifted;
+        }
+      } else if (b == 3) {
+        uint16_t shifted = (((uint16_t)a) << 1) ^ a;
+        if (shifted > 0xff) {
+          return (uint8_t)(shifted ^ 0x1b);
+        } else {
+          return shifted;
+        }
+      } else {
+        // I only need to multiply by 1, 2, and 3 for aes.
+        throw;
+      }
+    }
     void mixColumns() {
       std::vector<std::vector<uint8_t> > new_state(4, std::vector<uint8_t>(4, 0));
       for (unsigned int column = 0; column < 4; column++) {
-        for (unsigned int index = 0; index < 4; index++) {
+        for (unsigned int new_row = 0; new_row < 4; new_row++) {
           uint8_t cumulative = 0;
-          for (unsigned int row = 0; row < 4; row ++) {
-            uint8_t result = fixed_mat[index][row] * rows[row][column];
-            if (result > 0xff) {
-              cumulative = cumulative ^ (result ^ 0x1b);
-            } else {
-              cumulative = cumulative ^ result;
-            }
+          for (unsigned int row = 0; row < 4; row++) {
+            cumulative = cumulative ^ xtime(rows[row][column], fixed_mat[new_row][row]);
           }
-          new_state[index][column] = cumulative;
+          new_state[new_row][column] = cumulative;
         }
       }
       rows = new_state;
