@@ -58,9 +58,9 @@ class state {
       }
       // the final round doesn't include mixColumns step
       subBytes();
-      log.debug(10, "subBytes", to_string());
+      log.debug(total_rounds, "subBytes", to_string());
       shiftRows();
-      log.debug(10, "shiftRows", to_string());
+      log.debug(total_rounds, "shiftRows", to_string());
       addRoundKey(keys.next());
       return to_string();
     }

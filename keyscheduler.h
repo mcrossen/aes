@@ -11,11 +11,15 @@ class keyScheduler {
     keyScheduler(std::string key) {
       next_key = 0;
       unsigned int total_keys;
+      unsigned int prev_word_offset;
       if (key.size()*4 == 128) {
+        prev_word_offset = 4;
         total_keys = 11;
       } else if (key.size()*4 == 192) {
+        prev_word_offset = 6;
         total_keys = 13;
       } else if (key.size()*4 == 256) {
+        prev_word_offset = 8;
         total_keys = 15;
       } else {
         throw;
@@ -30,15 +34,32 @@ class keyScheduler {
       }
 
       next_rcon = 1;
-      for (unsigned int column = key.size()*4/WORD_LENGTH; column < columns.size(); column+=4) {
-        columns[column] = rcon(columns[column - 4], subBytes(rotWord(columns[column - 1])));
+      for (unsigned int column = key.size()*4/WORD_LENGTH; column < columns.size(); column+=prev_word_offset) {
+        columns[column] = rcon(columns[column - prev_word_offset], subBytes(rotWord(columns[column - 1])));
         for (unsigned int word_index = column + 1; word_index < column + 4 && word_index < columns.size(); word_index++) {
-          for (unsigned int row = 0; row < columns[word_index].size(); row++) {
-            columns[word_index][row] = columns[word_index-4][row] ^ columns[word_index-1][row];
+          basic_core_expand(word_index, prev_word_offset);
+        }
+        if (key.size()*4 == 256 && column+3 < columns.size()) {
+          std::vector<uint8_t> new_column = subBytes(columns[column+3]);
+          for (unsigned int row = 0; row < columns[column+4].size(); row++) {
+            columns[column + 4][row] = columns[column + 4 - prev_word_offset][row] ^ new_column[row];
+          }
+          for (unsigned int word_index = column + 5; word_index < column + 8 && word_index < columns.size(); word_index++) {
+            basic_core_expand(word_index, prev_word_offset);
+          }
+        } else if (key.size()*4 == 192) {
+          for (unsigned int word_index = column + 4; word_index < column + 6 && word_index < columns.size(); word_index++) {
+            basic_core_expand(word_index, prev_word_offset);
           }
         }
       }
       //logger log; log.debug(to_string()); // dump the entire key schedule to the display
+    }
+
+    void basic_core_expand(unsigned int word_index, unsigned int prev_word_offset) {
+      for (unsigned int row = 0; row < columns[word_index].size(); row++) {
+        columns[word_index][row] = columns[word_index - prev_word_offset][row] ^ columns[word_index-1][row];
+      }
     }
 
     std::vector<uint8_t> rcon(std::vector<uint8_t> prev_word, std::vector<uint8_t> word) {
