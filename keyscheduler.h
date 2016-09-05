@@ -9,7 +9,6 @@
 class keyScheduler {
   public:
     keyScheduler(std::string key) {
-      next_key = 0;
       unsigned int total_keys;
       unsigned int prev_word_offset;
       if (key.size()*4 == 128) {
@@ -92,18 +91,17 @@ class keyScheduler {
       return to_return;
     }
 
-    std::vector<std::vector<uint8_t> > next() {
+    std::vector<std::vector<uint8_t> > get(unsigned int key_index) {
       std::vector<std::vector<uint8_t> > to_return(4, vector<uint8_t>(4, 0));
       stringstream debug_string;
-      for (unsigned int column = next_key*4; column < next_key*4+4 && column < columns.size(); column++) {
+      for (unsigned int column = key_index*4; column < key_index*4+4 && column < columns.size(); column++) {
         for (unsigned int row = 0; row < columns[column].size(); row++) {
-          to_return[row][column - next_key*4] = columns[column][row];
-          debug_string << byte_to_hex(to_return[row][column - next_key*4]);
+          to_return[row][column - key_index*4] = columns[column][row];
+          debug_string << byte_to_hex(to_return[row][column - key_index*4]);
         }
       }
       logger log;
-      log.debug(next_key, "scheduler", debug_string.str());
-      next_key++;
+      log.debug(key_index, "scheduler", debug_string.str());
       return to_return;
     }
 
@@ -125,8 +123,6 @@ class keyScheduler {
 
   private:
     std::vector<std::vector<uint8_t> > columns;
-
-    unsigned int next_key;
 
     const uint8_t sbox[16][16] = {
       { 0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76 } ,

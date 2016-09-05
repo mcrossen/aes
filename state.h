@@ -31,18 +31,8 @@ class state {
       keyScheduler keys(key);
 
       log.debug(0, "input\t", to_string());
-      addRoundKey(keys.next());
-      unsigned int key_length = key.length() * 4;
-      unsigned int total_rounds;
-      if (key_length == 128) {
-        total_rounds = 10;
-      } else if (key_length == 192) {
-        total_rounds = 12;
-      } else if (key_length == 256) {
-        total_rounds = 14;
-      } else {
-        throw;
-      }
+      unsigned int total_rounds = numRounds(key);
+      addRoundKey(keys.get(0));
 
       // go through each round except the final round
       for (unsigned int round_index = 1; round_index < total_rounds; round_index++) {
@@ -53,7 +43,7 @@ class state {
         log.debug(round_index, "shiftRows", to_string());
         mixColumns();
         log.debug(round_index, "mixColumns", to_string());
-        addRoundKey(keys.next());
+        addRoundKey(keys.get(round_index));
         log.debug(round_index, "addRoundKey", to_string());
       }
       // the final round doesn't include mixColumns step
@@ -61,7 +51,7 @@ class state {
       log.debug(total_rounds, "subBytes", to_string());
       shiftRows();
       log.debug(total_rounds, "shiftRows", to_string());
-      addRoundKey(keys.next());
+      addRoundKey(keys.get(total_rounds));
       return to_string();
     }
 
@@ -121,6 +111,19 @@ class state {
       return output.str();
     }
   private:
+    unsigned int numRounds(std::string key) {
+      unsigned int key_length = key.length()*4;
+      if (key_length == 128) {
+        return 10;
+      } else if (key_length == 192) {
+        return 12;
+      } else if (key_length == 256) {
+        return 14;
+      } else {
+        throw;
+      }
+    }
+
     uint8_t xtime(uint8_t a, uint8_t b) {
       if (b == 1) {
         return a;
@@ -164,7 +167,7 @@ class state {
       { 0xe1, 0xf8, 0x98, 0x11, 0x69, 0xd9, 0x8e, 0x94, 0x9b, 0x1e, 0x87, 0xe9, 0xce, 0x55, 0x28, 0xdf } ,
       { 0x8c, 0xa1, 0x89, 0x0d, 0xbf, 0xe6, 0x42, 0x68, 0x41, 0x99, 0x2d, 0x0f, 0xb0, 0x54, 0xbb, 0x16 }
     };
-    
+
     const uint8_t fixed_mat[4][4] = {
       {2, 3, 1, 1} ,
       {1, 2, 3, 1} ,
