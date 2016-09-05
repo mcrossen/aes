@@ -5,6 +5,7 @@
 #define WORD_LENGTH 32
 #define UPPER_BITS_MASK 0xf0
 #define LOWER_BITS_MASK 0x0f
+#define NO_ROUND_SPECIFIED 0xffff
 
 class keyScheduler {
   public:
@@ -40,8 +41,10 @@ class keyScheduler {
         }
         if (key.size()*4 == 256 && column+3 < columns.size()) {
           std::vector<uint8_t> new_column = subBytes(columns[column+3]);
-          for (unsigned int row = 0; row < columns[column+4].size(); row++) {
-            columns[column + 4][row] = columns[column + 4 - prev_word_offset][row] ^ new_column[row];
+          if (column+4 < columns.size()) {
+            for (unsigned int row = 0; row < columns[column+4].size(); row++) {
+              columns[column + 4][row] = columns[column + 4 - prev_word_offset][row] ^ new_column[row];
+            }
           }
           for (unsigned int word_index = column + 5; word_index < column + 8 && word_index < columns.size(); word_index++) {
             basic_core_expand(word_index, prev_word_offset);
@@ -91,7 +94,7 @@ class keyScheduler {
       return to_return;
     }
 
-    std::vector<std::vector<uint8_t> > get(unsigned int key_index) {
+    std::vector<std::vector<uint8_t> > get(unsigned int key_index, unsigned int round_index = NO_ROUND_SPECIFIED) {
       std::vector<std::vector<uint8_t> > to_return(4, vector<uint8_t>(4, 0));
       stringstream debug_string;
       for (unsigned int column = key_index*4; column < key_index*4+4 && column < columns.size(); column++) {
@@ -101,7 +104,11 @@ class keyScheduler {
         }
       }
       logger log;
-      log.debug(key_index, "scheduler", debug_string.str());
+      if (round_index == NO_ROUND_SPECIFIED) {
+        log.debug(key_index, "scheduler", debug_string.str());
+      } else {
+        log.debug(round_index, "scheduler", debug_string.str());
+      }
       return to_return;
     }
 

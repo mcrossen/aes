@@ -35,22 +35,21 @@ int main(int argc, char** argv) {
     }
     args[0] = args[0].substr(0, 1);
 
-    std::string plaintext = std::string(args[1]);
+    std::string text_in = std::string(args[1]);
     std::string key = std::string(args[2]);
 
-    if (args[0] == "e") {
-      std::stringstream cypher_text;
-      for (unsigned int index = 0; index < plaintext.length(); index += BLOCK_LENGTH/4)
-      {
-        state crypt_state(plaintext.substr(0, BLOCK_LENGTH / 4));
-        cypher_text << crypt_state.encrypt(key);
+    std::stringstream text_out;
+    for (unsigned int index = 0; index < text_in.length(); index += BLOCK_LENGTH/4) {
+      state crypt_state(text_in.substr(0, BLOCK_LENGTH / 4));
+      if (args[0] == "e") {
+        text_out << crypt_state.encrypt(key);
+      } else if (args[0] == "d") {
+        text_out << crypt_state.decrypt(key);
+      } else {
+        std::cout << "invalid operation, must be either 'encrypt' or 'decrypt'" << std::endl;
       }
-      std::cout << cypher_text.str() << std::endl;
-    } else if (args[0] == "d") {
-
-    } else {
-      std::cout << "invalid operation, must be either 'encrypt' or 'decrypt'" << std::endl;
     }
+    std::cout << text_out.str() << std::endl;
 
     return 0;
   }
