@@ -65,7 +65,7 @@ class state {
 
     std::string decrypt(std::string key) {
       logger log;
-      
+
       keyScheduler keys(key);
 
       log.debug(0, "input\t", to_string());
