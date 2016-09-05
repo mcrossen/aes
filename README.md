@@ -14,6 +14,6 @@ To get a runnable executable, clone the repo and make the project like so:
 ```bash
 git clone https://github.com/mcrossen/aes.git
 cd aes/
-make all
+make
 ```
 If successful, this should've created an executable for you called "aes".
