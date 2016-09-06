@@ -6,6 +6,7 @@
 
 using namespace std;
 
+// convert a single hex digit to an integer
 unsigned int hex_char_to_int(char c) {
   switch(toupper(c)) {
     case '0': return 0;
@@ -28,6 +29,7 @@ unsigned int hex_char_to_int(char c) {
   }
 }
 
+// convert a long hex string to a number
 unsigned int hex_to_int(string hex) {
   unsigned int cumulative = 0;
   for (unsigned int index = 0; index < hex.length(); index++) {
@@ -36,10 +38,12 @@ unsigned int hex_to_int(string hex) {
   return cumulative;
 }
 
+// convert a char* of hex digits to a number
 unsigned int hex_to_int(char* hex) {
   return hex_to_int(string(hex));
 }
 
+// convert half a byte to a string of hex digits
 std::string half_byte_to_hex(uint8_t num) {
   switch(num) {
     case 0: return "0";
@@ -62,6 +66,7 @@ std::string half_byte_to_hex(uint8_t num) {
   }
 }
 
+// split a byte into two parts and convert to a string of hex digits
 std::string byte_to_hex(uint8_t num) {
   return half_byte_to_hex(num >> 4) + half_byte_to_hex(num & LOWER_BITS_MASK);
 }

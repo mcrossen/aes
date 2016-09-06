@@ -12,6 +12,7 @@ class keyScheduler {
     keyScheduler(std::string key) {
       unsigned int total_keys;
       unsigned int prev_word_offset;
+      // determine how many keys to create
       if (key.size()*4 == 128) {
         prev_word_offset = 4;
         total_keys = 11;
@@ -24,6 +25,10 @@ class keyScheduler {
       } else {
         throw;
       }
+
+      // the key scheduler stores all the keys in a very long vector of vectors.
+      // every 4 columns is a new key.
+      // there are 4 rows.
       columns = std::vector<std::vector<uint8_t> >(total_keys * 4, std::vector<uint8_t>(4, 0));
       unsigned int key_index = 0;
       for (unsigned int column = 0; column < key.size()*4/WORD_LENGTH; column++) {
@@ -33,15 +38,19 @@ class keyScheduler {
         }
       }
 
+      // start the key expansion
       next_rcon = 1;
       for (unsigned int column = key.size()*4/WORD_LENGTH; column < columns.size(); column+=prev_word_offset) {
+        // rotate the word, substitute the bytes, and xor it with the previous word and the same word from the previous chunk
         columns[column] = rcon(columns[column - prev_word_offset], subBytes(rotWord(columns[column - 1])));
         for (unsigned int word_index = column + 1; word_index < column + 4 && word_index < columns.size(); word_index++) {
           basic_core_expand(word_index, prev_word_offset);
         }
+        // only do the following if using a 256 bit key
         if (key.size()*4 == 256 && column+3 < columns.size()) {
           std::vector<uint8_t> new_column = subBytes(columns[column+3]);
           if (column+4 < columns.size()) {
+            // very similar to basic_core_expand, except use the subBytes column just created
             for (unsigned int row = 0; row < columns[column+4].size(); row++) {
               columns[column + 4][row] = columns[column + 4 - prev_word_offset][row] ^ new_column[row];
             }
@@ -49,6 +58,7 @@ class keyScheduler {
           for (unsigned int word_index = column + 5; word_index < column + 8 && word_index < columns.size(); word_index++) {
             basic_core_expand(word_index, prev_word_offset);
           }
+        // only do the following if using a 192 bit key
         } else if (key.size()*4 == 192) {
           for (unsigned int word_index = column + 4; word_index < column + 6 && word_index < columns.size(); word_index++) {
             basic_core_expand(word_index, prev_word_offset);
@@ -59,11 +69,13 @@ class keyScheduler {
     }
 
     void basic_core_expand(unsigned int word_index, unsigned int prev_word_offset) {
+      // xor it with the previous word and the same word from the previous chunk
       for (unsigned int row = 0; row < columns[word_index].size(); row++) {
         columns[word_index][row] = columns[word_index - prev_word_offset][row] ^ columns[word_index-1][row];
       }
     }
 
+    // xor a word with the rcon column
     std::vector<uint8_t> rcon(std::vector<uint8_t> prev_word, std::vector<uint8_t> word) {
       std::vector<uint8_t> to_return(word.size());
       for (unsigned int index = 0; index < word.size(); index++) {
@@ -73,6 +85,7 @@ class keyScheduler {
       return to_return;
     }
 
+    // rotate the word
     std::vector<uint8_t> rotWord(std::vector<uint8_t> word) {
       std::vector<uint8_t> to_return(word.size());
       for (unsigned int index = 1; index < word.size(); index++) {
@@ -82,10 +95,12 @@ class keyScheduler {
       return to_return;
     }
 
+    // lookup a byte from the sbox
     unsigned int subByte(uint8_t byte) {
       return sbox[(byte & UPPER_BITS_MASK) >> 4][byte & LOWER_BITS_MASK];
     }
 
+    // substitute all the bytes in a word from the sbox
     std::vector<uint8_t> subBytes(std::vector<uint8_t> word) {
       std::vector<uint8_t> to_return(word.size());
       for (unsigned int row = 0; row < word.size(); row++) {
@@ -94,15 +109,18 @@ class keyScheduler {
       return to_return;
     }
 
+    // get a key using the passed in index
     std::vector<std::vector<uint8_t> > get(unsigned int key_index, unsigned int round_index = NO_ROUND_SPECIFIED) {
       std::vector<std::vector<uint8_t> > to_return(4, vector<uint8_t>(4, 0));
       stringstream debug_string;
+      // convert the coloumns of rows to rows of columns
       for (unsigned int column = key_index*4; column < key_index*4+4 && column < columns.size(); column++) {
         for (unsigned int row = 0; row < columns[column].size(); row++) {
           to_return[row][column - key_index*4] = columns[column][row];
           debug_string << byte_to_hex(to_return[row][column - key_index*4]);
         }
       }
+      // an optional 'round_index' argument can be passed in. this is printed in the debug
       logger log;
       if (round_index == NO_ROUND_SPECIFIED) {
         log.debug(key_index, "scheduler", debug_string.str());
@@ -112,6 +130,7 @@ class keyScheduler {
       return to_return;
     }
 
+    // dump the entire keyscheduler
     std::string to_string() {
       stringstream to_return;
       bool first_line = true;
@@ -129,8 +148,10 @@ class keyScheduler {
     }
 
   private:
+    // the keyscheduler is kept as a long vector of columns of rows
     std::vector<std::vector<uint8_t> > columns;
 
+    // same sbox as the state
     const uint8_t sbox[16][16] = {
       { 0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76 } ,
       { 0xca, 0x82, 0xc9, 0x7d, 0xfa, 0x59, 0x47, 0xf0, 0xad, 0xd4, 0xa2, 0xaf, 0x9c, 0xa4, 0x72, 0xc0 } ,
@@ -150,8 +171,10 @@ class keyScheduler {
       { 0x8c, 0xa1, 0x89, 0x0d, 0xbf, 0xe6, 0x42, 0x68, 0x41, 0x99, 0x2d, 0x0f, 0xb0, 0x54, 0xbb, 0x16 }
     };
 
+    // keep track of which rcon is being used
     unsigned int next_rcon;
 
+    // the rcon words
     const uint8_t rcon_q[52][4] = {
       { 0x00, 0x00, 0x00, 0x00 }, // Rcon[] is 1-based, 0x so the first entry is just a place holder
       { 0x01, 0x00, 0x00, 0x00 },

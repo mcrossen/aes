@@ -4,22 +4,16 @@
 #include "hexhelpers.h"
 #include "keyscheduler.h"
 #include "logger.h"
-#include <iostream> //TODO: remove this
 
 #define BLOCK_LENGTH 128
 #define UPPER_BITS_MASK 0xf0
 #define LOWER_BITS_MASK 0x0f
-#define BIT_0 0b00000001
-#define BIT_1 0b00000010
-#define BIT_2 0b00000100
-#define BIT_3 0b00001000
-#define BIT_4 0b00010000
-#define BIT_5 0b00100000
-#define BIT_6 0b01000000
-#define BIT_7 0b10000000
 
+/* the state class holds the cypher state.
+it includes methods such as mixColumns, subBytes, etc */
 class state {
   public:
+    // the state is initialized with a string of hexadecimal digits (0-9, a-f) 128 bits long
     state(std::string block) {
       if (block.length()*4 != 128) {
         throw;
@@ -34,6 +28,8 @@ class state {
       }
     }
 
+    // use a key to encrypt the block passed in the constructor
+    // the key is a string of hexadecimal digits
     std::string encrypt(std::string key) {
       logger log;
 
@@ -63,6 +59,8 @@ class state {
       return to_string();
     }
 
+    // use a key to decrypt the block passed in the constructor
+    // the key is a string of hexadecimal digits
     std::string decrypt(std::string key) {
       logger log;
 
@@ -91,6 +89,9 @@ class state {
       return to_string();
     }
 
+    // pretty simple: 'add' a key from the keyscheduler to the state
+    // 'add' = XOR
+    // the key passed in should be a 4x4 vector
     void addRoundKey(std::vector<std::vector<uint8_t> > key) {
       for (unsigned int column = 0; column < 4; column++) {
         for (unsigned int row = 0; row < 4; row++) {
@@ -99,14 +100,17 @@ class state {
       }
     }
 
+    // look up a single byte from the sbox
     uint8_t subByte(uint8_t byte) {
       return sbox[(byte & UPPER_BITS_MASK) >> 4][byte & LOWER_BITS_MASK];
     }
 
+    // look up a single byte from the inverse sbox
     uint8_t invSubByte(uint8_t byte) {
       return invsbox[(byte & UPPER_BITS_MASK) >> 4][byte & LOWER_BITS_MASK];
     }
 
+    // substitute all bytes in the state through sbox lookups
     void subBytes() {
       for (unsigned int column = 0; column < 4; column++) {
         for (unsigned int row = 0; row < 4; row++) {
@@ -115,6 +119,7 @@ class state {
       }
     }
 
+    // substitute all bytes in the state through inverse sbox lookups
     void invSubBytes() {
       for (unsigned int column = 0; column < 4; column++) {
         for (unsigned int row = 0; row < 4; row++) {
@@ -123,6 +128,7 @@ class state {
       }
     }
 
+    // shift the second row by 1, the third row by 2, and the fourth row by 3
     void shiftRows() {
       for (unsigned int row = 0; row < 4; row++) {
         vector<unsigned int> newrow(4);
@@ -135,6 +141,7 @@ class state {
       }
     }
 
+    // same as shiftRows(), but in the opposite direction
     void invShiftRows() {
       for (unsigned int row = 0; row < 4; row++) {
         vector<unsigned int> newrow(4);
@@ -147,13 +154,16 @@ class state {
       }
     }
 
+    // multiply the state by a fixed transformation matrix.
+    // instead of multiplying, use ffMult. instead of addition, use XOR
     void mixColumns() {
       std::vector<std::vector<uint8_t> > new_state(4, std::vector<uint8_t>(4, 0));
+      // these nested loops basically just implement matrix addition
       for (unsigned int column = 0; column < 4; column++) {
         for (unsigned int new_row = 0; new_row < 4; new_row++) {
           uint8_t cumulative = 0;
           for (unsigned int row = 0; row < 4; row++) {
-            cumulative = cumulative ^ xtime(rows[row][column], fixed_mat[new_row][row]);
+            cumulative = cumulative ^ ffMult(rows[row][column], fixed_mat[new_row][row]);
           }
           new_state[new_row][column] = cumulative;
         }
@@ -161,13 +171,14 @@ class state {
       rows = new_state;
     }
 
+    // same as mixColumns, but multiply the state by the inverse transformation matrix
     void invMixColumns() {
       std::vector<std::vector<uint8_t> > new_state(4, std::vector<uint8_t>(4, 0));
       for (unsigned int column = 0; column < 4; column++) {
         for (unsigned int new_row = 0; new_row < 4; new_row++) {
           uint8_t cumulative = 0;
           for (unsigned int row = 0; row < 4; row++) {
-            cumulative = cumulative ^ xtime(rows[row][column], inv_fixed_mat[new_row][row]);
+            cumulative = cumulative ^ ffMult(rows[row][column], inv_fixed_mat[new_row][row]);
           }
           new_state[new_row][column] = cumulative;
         }
@@ -175,6 +186,7 @@ class state {
       rows = new_state;
     }
 
+    // return the state as a string of hexadecimal digits 128 bits long
     std::string to_string() {
       stringstream output;
       for (unsigned int column = 0; column < 4; column++) {
@@ -185,6 +197,7 @@ class state {
       return output.str();
     }
   private:
+    // given the key size, return the number of rounds to perform
     unsigned int numRounds(std::string key) {
       unsigned int key_length = key.length()*4;
       if (key_length == 128) {
@@ -198,23 +211,26 @@ class state {
       }
     }
 
-    uint8_t xtime(uint8_t a, uint8_t b) {
+    // finite field multiply used in mixColumns
+    uint8_t ffMult(uint8_t a, uint8_t b) {
       return shift(a, b, 0) ^ shift(a, b, 1) ^ shift(a, b, 2) ^ shift(a, b, 3) ^ shift(a, b, 4) ^ shift(a, b, 5) ^ shift(a, b, 6) ^ shift(a, b, 7);
     }
 
+    // helper function to ffMult
     uint8_t shift(uint8_t a, uint8_t b, uint8_t shift_amount) {
       if ((b & (0x01 << shift_amount)) > 0) {
-        return fix_shift(a, shift_amount);
+        return xtime(a, shift_amount);
       } else {
         return 0;
       }
     }
 
-    uint8_t fix_shift(uint8_t a, uint8_t shift_amount) {
+    // my version of xtime is recursive to handle different shift amounts.
+    uint8_t xtime(uint8_t a, uint8_t shift_amount) {
       if (shift_amount <= 0) {
         return a;
       } else {
-        uint16_t shifted = fix_shift(a, shift_amount - 1) << 1;
+        uint16_t shifted = xtime(a, shift_amount - 1) << 1;
         if (shifted > 0xff) {
           return (uint8_t)(shifted ^ 0x1b);
         } else {
@@ -223,8 +239,10 @@ class state {
       }
     }
 
+    // the state is stored as a 4x4 matrix (vector of vectors)
     std::vector<std::vector<uint8_t> > rows;
 
+    // the sbox used in subBytes()
     const uint8_t sbox[16][16] = {
       { 0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76 } ,
       { 0xca, 0x82, 0xc9, 0x7d, 0xfa, 0x59, 0x47, 0xf0, 0xad, 0xd4, 0xa2, 0xaf, 0x9c, 0xa4, 0x72, 0xc0 } ,
@@ -244,6 +262,7 @@ class state {
       { 0x8c, 0xa1, 0x89, 0x0d, 0xbf, 0xe6, 0x42, 0x68, 0x41, 0x99, 0x2d, 0x0f, 0xb0, 0x54, 0xbb, 0x16 }
     };
 
+    // the inverse sbox used in invSubBytes()
     const uint8_t invsbox[16][16] = {
     	{ 0x52, 0x09, 0x6a, 0xd5, 0x30, 0x36, 0xa5, 0x38, 0xbf, 0x40, 0xa3, 0x9e, 0x81, 0xf3, 0xd7, 0xfb } ,
     	{ 0x7c, 0xe3, 0x39, 0x82, 0x9b, 0x2f, 0xff, 0x87, 0x34, 0x8e, 0x43, 0x44, 0xc4, 0xde, 0xe9, 0xcb } ,
@@ -263,6 +282,7 @@ class state {
     	{ 0x17, 0x2b, 0x04, 0x7e, 0xba, 0x77, 0xd6, 0x26, 0xe1, 0x69, 0x14, 0x63, 0x55, 0x21, 0x0c, 0x7d }
   	};
 
+    // the fixed transformation matrix used in mixColumns()
     const uint8_t fixed_mat[4][4] = {
       {2, 3, 1, 1} ,
       {1, 2, 3, 1} ,
@@ -270,6 +290,7 @@ class state {
       {3, 1, 1, 2}
     };
 
+    // the inverse of the fixed transformation matrix used in invMixColumns
     const uint8_t inv_fixed_mat[4][4] = {
       {0x0e, 0x0b, 0x0d, 0x09} ,
       {0x09, 0x0e, 0x0b, 0x0d} ,

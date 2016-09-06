@@ -1,5 +1,5 @@
 # AES
-The AES cypher written in C++ for CS 360 at BYU by Mark Crossen.
+The AES cypher written in C++ for CS 465 at BYU by Mark Crossen.
 
 ## Usage
 To encrypt or decrypt a hexadecimal string, open a terminal and type:

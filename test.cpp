@@ -2,6 +2,7 @@
 #include "state.h"
 #include "logger.h"
 
+// compare an expected result against the actual result. display the status (successful|failed) of the test.
 void single_test(std::string test_name, std::string expected_result, std::string actual_result) {
   logger log;
   std::cout << "testing " << test_name;
@@ -10,11 +11,13 @@ void single_test(std::string test_name, std::string expected_result, std::string
     log.clear_buffer();
   } else {
     std::cout << " failed" << std::endl;
+    // if the test failed, print the debug log from the crypt
     log.dump_buffer(true);
     throw;
   }
 }
 
+// this is a simple script to test the encrypt/decrypt process.
 int main() {
   logger::suppress_output = true;
   logger::verbose = true;

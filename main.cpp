@@ -6,15 +6,18 @@
 
 #define BLOCK_LENGTH 128
 
+// this simply parses the command line and passes the information into state.h
+// all of the encryption process takes place in state.h and keyscheduler.h
 int main(int argc, char** argv) {
   if (argc >= 1) {
     std::string arg1 = std::string(argv[1]);
     if (arg1 == "help" || arg1 == "--help") {
-      std::cout << "aes [encrypt|decrypt] [text] [key]" << std::endl;
+      std::cout << "aes [-v] [encrypt|decrypt] [text] [key]" << std::endl;
       return 0;
     }
   }
 
+  // allow printing all the steps of the cypher when "-v" is passed in
   std::vector<std::string> args;
   logger::verbose = false;
   for (signed int index = 1; index < argc; index++) {
@@ -39,11 +42,14 @@ int main(int argc, char** argv) {
     std::string key = std::string(args[2]);
 
     std::stringstream text_out;
+    //split the passed in text into blocks of 128 bits
     for (unsigned int index = 0; index < text_in.length(); index += BLOCK_LENGTH/4) {
       state crypt_state(text_in.substr(0, BLOCK_LENGTH / 4));
       if (args[0] == "e") {
+        // start encrypting the plain text
         text_out << crypt_state.encrypt(key);
       } else if (args[0] == "d") {
+        // start decrypting the cypher text
         text_out << crypt_state.decrypt(key);
       } else {
         std::cout << "invalid operation, must be either 'encrypt' or 'decrypt'" << std::endl;
